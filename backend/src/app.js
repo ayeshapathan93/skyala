@@ -24,9 +24,16 @@ const { setupSchema } = require('./validators/auth.validator');
 
 const app = express();
 
-const corsOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
+const frontendUrls = (process.env.FRONTEND_URL || 'http://localhost:5173')
   .split(',')
-  .map((o) => o.trim());
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+const corsOrigins = Array.from(new Set(
+  process.env.NODE_ENV === 'production' && frontendUrls.length === 1 && frontendUrls[0] === 'http://localhost:5173'
+    ? [...frontendUrls, 'https://skyala.vercel.app']
+    : frontendUrls
+));
 
 const frameAncestors = ["'self'", ...corsOrigins];
 app.use(
@@ -46,6 +53,7 @@ app.use(
     credentials: true,
   })
 );
+app.options('*', cors({ origin: corsOrigins, credentials: true }));
 app.use(apiLimiter);
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
