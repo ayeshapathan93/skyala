@@ -1,0 +1,64 @@
+[
+  {
+    "billId": "BILL-20260428-392729",
+    "billNumber": "INV-0001",
+    "date": "2026-04-28T10:33:12.249Z",
+    "shopName": "My Shop",
+    "shopAddress": "",
+    "shopGst": "",
+    "shopMobile": "",
+    "customerName": "Jane Smith",
+    "customerPhone": "9876543211",
+    "customerAddress": "",
+    "items": [
+      {
+        "name": "Product B",
+        "hsn": "1234",
+        "qty": 1,
+        "unit": "pcs",
+        "rate": 250,
+        "discount": 0,
+        "amount": 250
+      }
+    ],
+    "subtotal": 250,
+    "totalQty": 1,
+    "discount": 0,
+    "cgst": 15,
+    "sgst": 15,
+    "totalAmount": 280,
+    "paidAmount": 280,
+    "balance": 0
+  },
+  {
+    "billId": "BILL-20260428-929249",
+    "billNumber": "INV-0002",
+    "date": "2026-04-28T10:58:49.240Z",
+    "shopName": "My Shop",
+    "shopAddress": "",
+    "shopGst": "",
+    "shopMobile": "",
+    "customerName": "Jane Smith",
+    "customerPhone": "9876543211",
+    "customerAddress": "",
+    "items": [
+      {
+        "name": "Product B",
+        "hsn": "1234",
+        "qty": 1,
+        "unit": "pcs",
+        "rate": 250,
+        "discount": 0,
+        "amount": 250
+      }
+    ],
+    "subtotal": 250,
+    "totalQty": 1,
+    "discount": 0,
+    "cgst": 15,
+    "sgst": 15,
+    "totalAmount": 280,
+    "paidAmount": 280,
+    "balance": 0
+  }
+]

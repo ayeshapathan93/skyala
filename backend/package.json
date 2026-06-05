@@ -1,0 +1,36 @@
+{
+  "name": "billing-inventory-backend",
+  "version": "1.0.0",
+  "description": "Business Billing & Inventory Management Backend",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "seed:customers": "node scripts/seed-customers.js",
+    "seed:customers:wipe": "node scripts/seed-customers.js --wipe",
+    "seed:saas": "node scripts/seed-saas.js",
+    "seed:saas:wipe": "node scripts/seed-saas.js --wipe",
+    "seed:skyla": "node scripts/seed-skyla.js",
+    "seed:skyla:wipe": "node scripts/seed-skyla.js --wipe"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^8.5.2",
+    "helmet": "^8.2.0",
+    "joi": "^18.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^8.0.3",
+    "nodemailer": "^8.0.1",
+    "puppeteer": "^24.0.0",
+    "swagger-jsdoc": "^6.3.0",
+    "swagger-ui-express": "^5.0.1",
+    "winston": "^3.19.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}
