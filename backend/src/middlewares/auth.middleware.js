@@ -18,7 +18,12 @@ const protect = asyncHandler(async (req, res, next) => {
     throw new AppError('Not authorized to access this route', 401, 'UNAUTHORIZED');
   }
 
-  const decoded = jwt.verify(token, process.env.JWT_SECRET);
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new AppError('JWT_SECRET environment variable is required for authentication', 500, 'CONFIG_ERROR');
+  }
+
+  const decoded = jwt.verify(token, secret);
   const user = await User.findById(decoded.id).select('+password');
 
   if (!user) {

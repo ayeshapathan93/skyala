@@ -261,6 +261,17 @@ const createBill = async (payload, businessId) => {
     const totals = computeTotals(normalizedItems, discountPercent, gstPercent);
 
     const paymentType = payload.paymentType || 'cash';
+    const parseBillDate = (value) => {
+      if (!value) return new Date();
+      if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        const [year, month, day] = value.split('-').map(Number);
+        return new Date(year, month - 1, day);
+      }
+      return new Date(value);
+    };
+
+    const billDate = parseBillDate(payload.billDate);
+
     const receivedAmount = roundMoney(
       payload.receivedAmount === undefined || payload.receivedAmount === null
         ? paymentType === 'credit'
@@ -303,7 +314,7 @@ const createBill = async (payload, businessId) => {
           paymentStatus,
           dueDate: paymentType === 'credit' ? payload.dueDate || null : null,
           notes: payload.notes || '',
-          billDate: payload.billDate || new Date(),
+          billDate,
         },
       ],
       session ? { session } : undefined
@@ -429,22 +440,39 @@ const generatePdf = async (bill, businessId) => {
   try {
     browser = await puppeteer.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
     });
     const page = await browser.newPage();
     await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 2 });
-    await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 30000 });
+
+    const contentUrl = `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+    await page.goto(contentUrl, { waitUntil: 'networkidle0', timeout: 45000 });
+    await page.waitForSelector('body', { timeout: 10000 });
     await page.evaluate(() => document.fonts?.ready);
-    await new Promise((r) => setTimeout(r, 400));
-    const pdfBuffer = await page.pdf({
+    await page.waitForTimeout(500);
+    await page.emulateMediaType('screen');
+
+    const pdfOptions = {
       format: 'A4',
       printBackground: true,
       preferCSSPageSize: true,
       margin: { top: '6mm', right: '6mm', bottom: '6mm', left: '6mm' },
-    });
-    if (!pdfBuffer || pdfBuffer.length < 100 || !pdfBuffer.slice(0, 5).toString().startsWith('%PDF')) {
-      throw new Error('Generated PDF is invalid');
+    };
+
+    const pdfBuffer = await page.pdf(pdfOptions);
+    const isValidPdf =
+      pdfBuffer &&
+      pdfBuffer.length >= 100 &&
+      pdfBuffer.toString('utf8', 0, 4) === '%PDF';
+
+    if (!isValidPdf) {
+      const retryBuffer = await page.pdf(pdfOptions);
+      if (!retryBuffer || retryBuffer.length < 100 || retryBuffer.toString('utf8', 0, 4) !== '%PDF') {
+        throw new Error('Generated PDF is invalid');
+      }
+      return { pdfBuffer: retryBuffer, invoiceData, filename: `${bill.invoiceNumber}.pdf` };
     }
+
     return { pdfBuffer, invoiceData, filename: `${bill.invoiceNumber}.pdf` };
   } finally {
     if (browser) await browser.close().catch(() => {});

@@ -137,7 +137,7 @@ export default function CreateBillPage() {
         gstPercent,
         receivedAmount,
         paymentType,
-        billDate: new Date().toISOString().slice(0, 10),
+        billDate: new Date().toISOString(),
         saveCustomer: false,
       });
       navigate(`/bills/${bill._id}`);

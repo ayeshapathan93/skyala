@@ -4,13 +4,21 @@ const Business = require('../models/Business');
 const AppError = require('../utils/appError');
 const logger = require('../config/logger');
 
+const getJwtSecret = () => {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new AppError('JWT_SECRET environment variable is required for authentication', 500, 'CONFIG_ERROR');
+  }
+  return secret;
+};
+
 const generateToken = (userId) =>
-  jwt.sign({ id: userId }, process.env.JWT_SECRET, {
+  jwt.sign({ id: userId }, getJwtSecret(), {
     expiresIn: process.env.JWT_EXPIRES_IN || process.env.JWT_EXPIRE || '7d',
   });
 
 const generateRefreshToken = (userId) =>
-  jwt.sign({ id: userId, type: 'refresh' }, process.env.JWT_SECRET, {
+  jwt.sign({ id: userId, type: 'refresh' }, getJwtSecret(), {
     expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d',
   });
 
@@ -92,7 +100,7 @@ const login = async ({ email, password }) => {
 const refreshAccessToken = async (refreshToken) => {
   if (!refreshToken) throw new AppError('Refresh token required', 401, 'UNAUTHORIZED');
 
-  const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
+  const decoded = jwt.verify(refreshToken, getJwtSecret());
   if (decoded.type !== 'refresh') throw new AppError('Invalid refresh token', 401, 'UNAUTHORIZED');
 
   const user = await User.findById(decoded.id).select('+refreshToken');

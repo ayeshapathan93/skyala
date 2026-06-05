@@ -12,19 +12,20 @@ const startOfDay = (date = new Date()) => {
   return d;
 };
 
-const endOfDay = (date = new Date()) => {
-  const d = new Date(date);
-  d.setHours(23, 59, 59, 999);
+const startOfNextDay = (date = new Date()) => {
+  const d = startOfDay(date);
+  d.setDate(d.getDate() + 1);
   return d;
 };
 
 const getDashboard = async (businessId) => {
   const now = new Date();
   const todayStart = startOfDay(now);
-  const todayEnd = endOfDay(now);
+  const tomorrowStart = startOfNextDay(now);
   const weekStart = new Date(todayStart);
   weekStart.setDate(weekStart.getDate() - 6);
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const effectiveBillDate = { $ifNull: ['$billDate', '$createdAt'] };
 
   const businessObjectId = new mongoose.Types.ObjectId(businessId);
 
@@ -50,22 +51,30 @@ const getDashboard = async (businessId) => {
       { $group: { _id: null, total: { $sum: '$totalAmount' }, count: { $sum: 1 } } },
     ]),
     Bill.aggregate([
-      { $match: { businessId: businessObjectId, billDate: { $gte: todayStart, $lte: todayEnd } } },
+      { $match: { businessId: businessObjectId } },
+      { $addFields: { effectiveBillDate } },
+      { $match: { effectiveBillDate: { $gte: todayStart, $lt: tomorrowStart } } },
       { $group: { _id: null, total: { $sum: '$totalAmount' }, count: { $sum: 1 } } },
     ]),
     Bill.aggregate([
-      { $match: { businessId: businessObjectId, billDate: { $gte: weekStart, $lte: todayEnd } } },
+      { $match: { businessId: businessObjectId } },
+      { $addFields: { effectiveBillDate } },
+      { $match: { effectiveBillDate: { $gte: weekStart, $lt: tomorrowStart } } },
       { $group: { _id: null, total: { $sum: '$totalAmount' }, count: { $sum: 1 } } },
     ]),
     Bill.aggregate([
-      { $match: { businessId: businessObjectId, billDate: { $gte: monthStart, $lte: todayEnd } } },
+      { $match: { businessId: businessObjectId } },
+      { $addFields: { effectiveBillDate } },
+      { $match: { effectiveBillDate: { $gte: monthStart, $lt: tomorrowStart } } },
       { $group: { _id: null, total: { $sum: '$totalAmount' }, count: { $sum: 1 } } },
     ]),
     Bill.aggregate([
-      { $match: { businessId: businessObjectId, billDate: { $gte: weekStart, $lte: todayEnd } } },
+      { $match: { businessId: businessObjectId } },
+      { $addFields: { effectiveBillDate } },
+      { $match: { effectiveBillDate: { $gte: weekStart, $lt: tomorrowStart } } },
       {
         $group: {
-          _id: { $dateToString: { format: '%Y-%m-%d', date: '$billDate' } },
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$effectiveBillDate' } },
           revenue: { $sum: '$totalAmount' },
           orders: { $sum: 1 },
         },
