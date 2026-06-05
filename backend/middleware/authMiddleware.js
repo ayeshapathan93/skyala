@@ -3,6 +3,12 @@ const User = require('../models/User');
 const asyncHandler = require('./asyncHandler');
 
 exports.protect = asyncHandler(async (req, res, next) => {
+
+    // ✅ FIX: allow CORS preflight requests
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+
     if (process.env.DISABLE_AUTH === 'true') {
         const businessId = process.env.DEV_BUSINESS_ID || req.headers['x-business-id'];
         if (!businessId) {
