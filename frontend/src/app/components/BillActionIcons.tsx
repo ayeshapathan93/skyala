@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Download, Printer, MessageCircle, Loader2 } from "lucide-react";
+import { Download, Printer, Loader2 } from "lucide-react";
 import { api } from "../lib/api";
 import {
   openInvoicePrintWindow,
@@ -34,7 +34,7 @@ export default function BillActionIcons({
   billDate,
   className = "",
 }: BillActionIconsProps) {
-  const [busy, setBusy] = useState<"print" | "pdf" | "wa" | null>(null);
+  const [busy, setBusy] = useState<"print" | "pdf" | null>(null);
   const [error, setError] = useState("");
 
   const loadHtml = async () => {
@@ -52,11 +52,6 @@ export default function BillActionIcons({
       /* client fallback */
     }
     return generateInvoicePdfBlob(html);
-  };
-
-  const whatsappSummary = () => {
-    const dateStr = billDate ? new Date(billDate).toLocaleDateString("en-IN") : "";
-    return `Invoice ${invoiceNumber}\nDate: ${dateStr}\nTotal: Rs. ${totalAmount.toLocaleString("en-IN")}\nBalance: Rs. ${balanceAmount.toLocaleString("en-IN")}\n— SKYLA`;
   };
 
   const printBill = async () => {
@@ -93,35 +88,6 @@ export default function BillActionIcons({
     }
   };
 
-  const shareWhatsApp = async () => {
-    if (!customerPhone?.trim()) {
-      setError("Customer phone missing — add phone in customer profile.");
-      return;
-    }
-    setBusy("wa");
-    setError("");
-    const summary = whatsappSummary();
-    try {
-      const html = await loadHtml();
-      const blob = await resolvePdf(html);
-      if (blob && (await isPdfBlob(blob))) {
-        const file = new File([blob], `${invoiceNumber}.pdf`, { type: "application/pdf" });
-        if (navigator.share && navigator.canShare?.({ files: [file] })) {
-          await navigator.share({ files: [file], title: invoiceNumber, text: summary });
-          return;
-        }
-        downloadBlob(blob, `${invoiceNumber}.pdf`);
-        setTimeout(() => api.shareWhatsApp(customerPhone, `${summary}\n\n(PDF saved — attach it)`), 400);
-        return;
-      }
-      api.shareWhatsApp(customerPhone, summary);
-    } catch {
-      api.shareWhatsApp(customerPhone, summary);
-    } finally {
-      setBusy(null);
-    }
-  };
-
   return (
     <div className={className}>
       <div className="flex items-center gap-1.5">
@@ -144,16 +110,6 @@ export default function BillActionIcons({
           className={`${iconBtn} bg-primary text-primary-foreground hover:opacity-90`}
         >
           {busy === "pdf" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-        </button>
-        <button
-          type="button"
-          onClick={shareWhatsApp}
-          disabled={busy !== null}
-          title={customerPhone ? "WhatsApp" : "WhatsApp (phone required)"}
-          aria-label="Share on WhatsApp"
-          className={`${iconBtn} bg-brand-green/15 text-brand-green border border-brand-green/30 hover:bg-brand-green/25`}
-        >
-          {busy === "wa" ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" />}
         </button>
       </div>
       {error && <p className="text-xs text-destructive mt-1 max-w-[200px]">{error}</p>}

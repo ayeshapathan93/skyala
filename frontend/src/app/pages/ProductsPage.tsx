@@ -14,6 +14,7 @@ type ProductForm = {
   gstRate: string;
   stock: string;
   minimumStockLevel: string;
+  addStock: string;
 };
 
 const emptyForm: ProductForm = {
@@ -25,6 +26,7 @@ const emptyForm: ProductForm = {
   gstRate: "0",
   stock: "0",
   minimumStockLevel: "10",
+  addStock: "0",
 };
 
 const productId = (p: Product) => p._id || "";
@@ -97,6 +99,7 @@ export default function ProductsPage() {
       gstRate: String(p.gstRate ?? 0),
       stock: String(p.stock ?? 0),
       minimumStockLevel: String(p.minimumStockLevel ?? 10),
+      addStock: "0",
     });
     setFormErrors({});
     setModalOpen(true);
@@ -120,13 +123,23 @@ export default function ProductsPage() {
     if (n) errs.name = n;
     const s = validateSellingPrice(form.sellingPrice, form.purchasePrice);
     if (s) errs.sellingPrice = s;
-    const st = validatePositiveNumber(form.stock, "Stock", false);
-    if (st) errs.stock = st;
+    if (editingId) {
+      const addStErr = validatePositiveNumber(form.addStock, "Add Stock", false);
+      if (addStErr) errs.addStock = addStErr;
+    } else {
+      const st = validatePositiveNumber(form.stock, "Stock", false);
+      if (st) errs.stock = st;
+    }
     setFormErrors(errs);
     if (Object.keys(errs).length) return;
 
     setSaving(true);
     setError("");
+    
+    const currentProduct = editingId ? products.find((p) => productId(p) === editingId) : null;
+    const currentStock = currentProduct ? currentProduct.stock : 0;
+    const addedStock = Number(form.addStock || 0);
+
     const payload = {
       name: form.name.trim(),
       category: form.category.trim(),
@@ -135,7 +148,7 @@ export default function ProductsPage() {
       mrp: Number(form.mrp || 0),
       gstRate: Number(form.gstRate || 0),
       unit: "pcs",
-      stock: Number(form.stock || 0),
+      stock: editingId ? currentStock + addedStock : Number(form.stock || 0),
       minimumStockLevel: Number(form.minimumStockLevel || 10),
     };
     try {
@@ -248,7 +261,18 @@ export default function ProductsPage() {
                   <span className="text-sm font-medium">GST %</span>
                   <input type="number" min="0" max="28" className="input-field" value={form.gstRate} onChange={(e) => setForm({ ...form, gstRate: e.target.value })} />
                 </label>
-                {!editingId && (
+                {editingId ? (
+                  <div className="col-span-2 space-y-1">
+                    <div className="flex justify-between items-center text-sm font-medium">
+                      <span>Add Stock</span>
+                      <span className="text-muted-foreground text-xs">Current Stock: {
+                        products.find((p) => productId(p) === editingId)?.stock ?? 0
+                      }</span>
+                    </div>
+                    <input type="number" min="0" className={`input-field ${formErrors.addStock ? "border-destructive" : ""}`} value={form.addStock} onChange={(e) => setForm({ ...form, addStock: e.target.value })} />
+                    {formErrors.addStock && <span className="text-xs text-destructive">{formErrors.addStock}</span>}
+                  </div>
+                ) : (
                   <label className="block space-y-1 col-span-2">
                     <span className="text-sm font-medium">Opening Stock</span>
                     <input type="number" min="0" className="input-field" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} />

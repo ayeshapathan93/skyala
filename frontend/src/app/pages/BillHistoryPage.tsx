@@ -1,11 +1,21 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState, Fragment } from "react";
 import { Link } from "react-router";
-import { Download, FileText, Plus, Phone, MapPin } from "lucide-react";
+import { Download, Plus, Phone, MapPin, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import BillActionIcons from "../components/BillActionIcons";
 import SearchBar from "../components/SearchBar";
-import { motion } from "motion/react";
 import { api, type Bill } from "../lib/api";
 import { exportBillsToExcel } from "../lib/exportUtils";
+
+interface CustomerGroup {
+  key: string;
+  customerId: string;
+  customerName: string;
+  customerPhone: string;
+  customerAddress: string;
+  bills: Bill[];
+  totalAmount: number;
+  balanceAmount: number;
+}
 
 const billStatus = (bill: Bill) => {
   if (bill.paymentStatus === "paid") return "paid";
@@ -19,16 +29,22 @@ export default function BillHistoryPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
   const handleExport = () => {
     exportBillsToExcel(bills);
   };
 
-  useEffect(() => {
+  const loadBills = () => {
+    setLoading(true);
     api.bills({ limit: 100 })
       .then((result) => setBills(result.data))
       .catch((err) => setError(err instanceof Error ? err.message : "Could not load bills"))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadBills();
   }, []);
 
   const filteredBills = bills.filter((bill) => {
@@ -49,13 +65,66 @@ export default function BillHistoryPage() {
     }
   };
 
+  const handleDeleteBill = async (billId: string, invoiceNumber: string) => {
+    if (!window.confirm(`Delete bill "${invoiceNumber}"? This will restore product stock and cannot be undone.`)) {
+      return;
+    }
+    setError("");
+    try {
+      await api.deleteBill(billId);
+      // Reload bills
+      const result = await api.bills({ limit: 100 });
+      setBills(result.data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete bill");
+    }
+  };
+
+  const grouped = useMemo(() => {
+    const groupsMap = new Map<string, CustomerGroup>();
+
+    for (const bill of filteredBills) {
+      let key = "";
+      if (bill.customerId) {
+        key = bill.customerId;
+      } else {
+        key = `walkin-${bill.customerName || "Walk-in Customer"}-${bill.customerPhone || ""}`;
+      }
+
+      const existing = groupsMap.get(key);
+      if (existing) {
+        existing.bills.push(bill);
+        existing.totalAmount += bill.totalAmount;
+        existing.balanceAmount += bill.balanceAmount || 0;
+      } else {
+        groupsMap.set(key, {
+          key,
+          customerId: bill.customerId || "",
+          customerName: bill.customerName || "Walk-in Customer",
+          customerPhone: bill.customerPhone || "",
+          customerAddress: bill.customerAddress || "",
+          bills: [bill],
+          totalAmount: bill.totalAmount,
+          balanceAmount: bill.balanceAmount || 0,
+        });
+      }
+    }
+
+    return Array.from(groupsMap.values());
+  }, [filteredBills]);
+
+  const toggleGroup = (key: string) => {
+    setExpandedGroups((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="page-title">
-            Bill History
-          </h1>
+          <h1 className="page-title">Bill History</h1>
           <p className="text-muted-foreground mt-1">View and manage all invoices</p>
         </div>
         <Link to="/bills/create" className="btn-brand">
@@ -109,77 +178,148 @@ export default function BillHistoryPage() {
 
       {loading ? (
         <div className="bg-card border border-border rounded-2xl p-12 text-center text-muted-foreground">Loading bills...</div>
-      ) : filteredBills.length === 0 ? (
+      ) : grouped.length === 0 ? (
         <div className="bg-card border border-border rounded-2xl p-12 text-center text-muted-foreground">No bills found</div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredBills.map((bill, index) => {
-            const status = billStatus(bill);
-            return (
-              <motion.div
-                key={bill._id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
-                whileHover={{ y: -4 }}
-                className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all"
-              >
-                <div className="bg-primary/10 p-4 border-b border-border">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-muted-foreground">Invoice</span>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(status)}`}>{status}</span>
-                  </div>
-                  <h3 className="text-2xl font-bold">{bill.invoiceNumber}</h3>
-                </div>
-
-                <div className="p-4 space-y-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center flex-shrink-0">
-                      <FileText className="w-5 h-5 text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{bill.customerName || "Walk-in Customer"}</p>
-                      <p className="text-sm text-muted-foreground">{new Date(bill.billDate).toLocaleDateString()}</p>
-                      {bill.customerPhone && (
-                        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                          <Phone className="w-3 h-3" /> {bill.customerPhone}
-                        </p>
-                      )}
-                      {bill.customerAddress && (
-                        <p className="text-xs text-muted-foreground flex items-start gap-1 mt-0.5 line-clamp-1">
-                          <MapPin className="w-3 h-3 shrink-0" /> {bill.customerAddress}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between items-center pt-2 border-t border-border">
-                    <span className="text-sm text-muted-foreground">Amount</span>
-                    <span className="text-xl font-bold">Rs. {bill.totalAmount.toLocaleString()}</span>
-                  </div>
-
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Payment</span>
-                    <span className="text-sm font-medium capitalize">{bill.paymentType}</span>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-2 pt-2 mt-2 border-t border-border">
-                    <Link to={`/bills/${bill._id}`} className="text-sm text-primary font-medium hover:underline">
-                      View Details
-                    </Link>
-                    <BillActionIcons
-                      billId={bill._id}
-                      invoiceNumber={bill.invoiceNumber}
-                      customerPhone={bill.customerPhone}
-                      totalAmount={bill.totalAmount}
-                      balanceAmount={bill.balanceAmount}
-                      billDate={bill.billDate}
-                    />
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })}
+        <div className="overflow-x-auto rounded-2xl border border-border bg-card shadow-sm">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-accent/40 border-b border-border text-sm font-semibold text-muted-foreground">
+                <th className="p-4 w-12 text-center"></th>
+                <th className="p-4 w-[240px] max-w-[240px]">Customer</th>
+                <th className="p-4 w-[150px] max-w-[150px] hidden sm:table-cell">Phone</th>
+                <th className="p-4 w-[100px] max-w-[100px] text-center">Bills</th>
+                <th className="p-4 w-[150px] max-w-[150px] text-right">Total Billed</th>
+                <th className="p-4 w-[150px] max-w-[150px] text-right text-warning font-semibold">Outstanding</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {grouped.map((group) => {
+                const isExpanded = !!expandedGroups[group.key];
+                return (
+                  <Fragment key={group.key}>
+                    <tr
+                      className="hover:bg-accent/20 transition-all cursor-pointer select-none"
+                      onClick={() => toggleGroup(group.key)}
+                    >
+                      <td className="p-4 text-center">
+                        <button className="p-1 hover:bg-accent rounded-lg transition-colors">
+                          {isExpanded ? (
+                            <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                          )}
+                        </button>
+                      </td>
+                      <td className="p-4 w-[240px] max-w-[240px] break-words whitespace-normal">
+                        <div className="font-semibold text-foreground text-sm sm:text-base break-words whitespace-normal">{group.customerName}</div>
+                        {group.customerAddress && (
+                          <div className="text-xs text-muted-foreground flex items-start gap-1 mt-0.5 break-words whitespace-normal">
+                            <MapPin className="w-3 h-3 shrink-0 mt-0.5" />
+                            <span>{group.customerAddress}</span>
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-4 w-[150px] max-w-[150px] text-sm hidden sm:table-cell">
+                        {group.customerPhone ? (
+                          <span className="inline-flex items-center gap-1">
+                            <Phone className="w-3.5 h-3.5 text-muted-foreground" /> {group.customerPhone}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground/50">-</span>
+                        )}
+                      </td>
+                      <td className="p-4 w-[100px] max-w-[100px] text-center text-sm font-medium">
+                        <span className="px-2.5 py-1 bg-accent rounded-full text-xs font-bold">{group.bills.length}</span>
+                      </td>
+                      <td className="p-4 w-[150px] max-w-[150px] text-right text-sm font-semibold">
+                        Rs. {group.totalAmount.toLocaleString("en-IN")}
+                      </td>
+                      <td className="p-4 w-[150px] max-w-[150px] text-right text-sm font-bold text-warning">
+                        Rs. {group.balanceAmount.toLocaleString("en-IN")}
+                      </td>
+                    </tr>
+                    {isExpanded && (
+                      <tr className="bg-accent/5">
+                        <td colSpan={6} className="p-4 border-t border-border">
+                          <div className="overflow-x-auto rounded-xl border border-border bg-card/60 p-2 shadow-inner">
+                            <table className="w-full text-left border-collapse text-xs min-w-[600px]">
+                              <thead>
+                                <tr className="border-b border-border/80 font-semibold text-muted-foreground">
+                                  <th className="p-2.5">Date</th>
+                                  <th className="p-2.5">Invoice Number</th>
+                                  <th className="p-2.5 text-center">Type</th>
+                                  <th className="p-2.5 text-center">Status</th>
+                                  <th className="p-2.5 text-right">Amount</th>
+                                  <th className="p-2.5 text-right">Balance</th>
+                                  <th className="p-2.5 text-right pr-4">Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-border/40">
+                                {group.bills.map((bill) => {
+                                  const status = billStatus(bill);
+                                  return (
+                                    <tr key={bill._id} className="hover:bg-accent/30 transition-colors">
+                                      <td className="p-2.5 font-medium whitespace-nowrap">
+                                        {new Date(bill.billDate).toLocaleDateString("en-IN")}
+                                      </td>
+                                      <td className="p-2.5">
+                                        <Link
+                                          to={`/bills/${bill._id}`}
+                                          className="text-primary font-semibold hover:underline"
+                                        >
+                                          {bill.invoiceNumber}
+                                        </Link>
+                                      </td>
+                                      <td className="p-2.5 text-center capitalize font-medium">{bill.paymentType}</td>
+                                      <td className="p-2.5 text-center">
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getStatusColor(status)}`}>
+                                          {status}
+                                        </span>
+                                      </td>
+                                      <td className="p-2.5 text-right font-semibold">
+                                        Rs. {bill.totalAmount.toLocaleString("en-IN")}
+                                      </td>
+                                      <td className="p-2.5 text-right font-semibold text-warning">
+                                        Rs. {(bill.balanceAmount || 0).toLocaleString("en-IN")}
+                                      </td>
+                                      <td className="p-2.5 text-right pr-4">
+                                        <div className="inline-flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                          <BillActionIcons
+                                            billId={bill._id}
+                                            invoiceNumber={bill.invoiceNumber}
+                                            customerPhone={bill.customerPhone}
+                                            totalAmount={bill.totalAmount}
+                                            balanceAmount={bill.balanceAmount}
+                                            billDate={bill.billDate}
+                                          />
+                                          <button
+                                            onClick={(e) => {
+                                              e.preventDefault();
+                                              e.stopPropagation();
+                                              handleDeleteBill(bill._id, bill.invoiceNumber);
+                                            }}
+                                            className="p-1.5 text-destructive hover:bg-destructive/10 rounded-lg transition-colors ml-1"
+                                            title="Delete Bill"
+                                          >
+                                            <Trash2 className="w-4 h-4" />
+                                          </button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

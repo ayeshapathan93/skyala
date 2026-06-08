@@ -24,6 +24,20 @@ const numberToWords = (num) => {
   return `${rupees} Rupees and ${toWords(paisa)} Paise Only`;
 };
 
+const fs = require('fs');
+const path = require('path');
+
+let LOGO_BASE64 = '';
+try {
+  const logoPath = path.join(__dirname, '..', '..', 'frontend', 'public', 'skyla-logo.png');
+  if (fs.existsSync(logoPath)) {
+    const logoBuffer = fs.readFileSync(logoPath);
+    LOGO_BASE64 = 'data:image/png;base64,' + logoBuffer.toString('base64');
+  }
+} catch (_) {
+  // logo embedding is best-effort; fall back gracefully
+}
+
 module.exports = (invoice) => {
   const money = (n) => Number(Number.isFinite(Number(n)) ? Number(n) : 0);
   const qtyNum = (n) => Number(Number.isFinite(Number(n)) ? Number(n) : 0);
@@ -91,26 +105,32 @@ module.exports = (invoice) => {
   <meta charset="utf-8" />
   <title>Invoice ${billNumber || ''}</title>
   <style>
-    @page { size: A4; margin: 10mm; }
+    @page { size: A4; margin: 5mm; }
     * { box-sizing: border-box; }
     body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 0; background: #fff; }
-    .page { width: 210mm; min-height: 297mm; margin: 0 auto; }
-    .invoice { border: 1px solid #111; padding: 10mm; }
+    .page { width: 170mm; min-height: 240mm; margin: 0 auto; }
+    .invoice { border: 1px solid #111; padding: 4mm 5mm; }
 
-    .row { display: flex; justify-content: space-between; gap: 10mm; }
+    .header-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2mm; gap: 4mm; }
+    .logo-section { flex: 0 0 auto; }
+    .logo-section img { height: 30mm; width: auto; }
+    .header-right { text-align: right; font-size: 10px; line-height: 1.4; }
+    .header-right .bill-date { font-weight: 600; }
+
+    .row { display: flex; justify-content: space-between; gap: 4mm; }
     .col { flex: 1; }
-    .shop-name { font-size: 18px; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase; }
-    .small { font-size: 11px; line-height: 1.35; }
+    .shop-name { font-size: 16px; font-weight: 700; letter-spacing: 0.2px; text-transform: uppercase; margin-bottom: 1mm; }
+    .small { font-size: 10px; line-height: 1.3; }
     .muted { color: #333; }
-    .title { text-align: center; font-size: 16px; font-weight: 700; margin: 4mm 0 3mm; text-transform: uppercase; }
+    .title { text-align: center; font-size: 14px; font-weight: 700; margin: 2mm 0 2mm; text-transform: uppercase; }
 
-    table.box { width: 100%; border-collapse: collapse; font-size: 11px; }
-    table.box td { border: 1px solid #111; padding: 2.4mm 2.8mm; vertical-align: top; }
+    table.box { width: 100%; border-collapse: collapse; font-size: 10px; }
+    table.box td { border: 1px solid #111; padding: 1.8mm 2mm; vertical-align: top; }
     table.box td.half { width: 50%; }
 
-    table.items { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 11px; }
-    table.items th, table.items td { border: 1px solid #111; padding: 2.2mm 2.2mm; }
-    table.items th { background: #f2f2f2; font-weight: 700; text-transform: uppercase; font-size: 10.5px; }
+    table.items { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 10px; }
+    table.items th, table.items td { border: 1px solid #111; padding: 1.6mm 1.6mm; }
+    table.items th { background: #f2f2f2; font-weight: 700; text-transform: uppercase; font-size: 9.5px; }
 
     .center { text-align: center; }
     .right { text-align: right; }
@@ -123,34 +143,43 @@ module.exports = (invoice) => {
     .w-disc { width: 10%; }
     .w-amt { width: 16%; }
 
-    .summary-wrap { display: flex; gap: 6mm; margin-top: 4mm; }
-    .words { flex: 1; border: 1px solid #111; padding: 3mm; }
-    .words .head { font-size: 10.5px; font-weight: 700; text-transform: uppercase; margin-bottom: 1mm; }
+    .summary-wrap { display: flex; gap: 3mm; margin-top: 2mm; }
+    .words { flex: 1; border: 1px solid #111; padding: 2mm; }
+    .words .head { font-size: 9.5px; font-weight: 700; text-transform: uppercase; margin-bottom: 0.8mm; }
 
-    table.summary { width: 74mm; border-collapse: collapse; font-size: 11px; }
-    table.summary td { border: 1px solid #111; padding: 2.2mm 2.6mm; }
+    table.summary { width: 70mm; border-collapse: collapse; font-size: 10px; }
+    table.summary td { border: 1px solid #111; padding: 1.6mm 2mm; }
     table.summary td.label { font-weight: 700; }
-    table.summary tr.total td { font-weight: 700; font-size: 12px; }
+    table.summary tr.total td { font-weight: 700; font-size: 11px; }
 
-    .sign-row { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 10mm; gap: 8mm; }
-    .note { font-size: 10px; color: #333; }
-    .sign { width: 65mm; text-align: center; }
-    .sign .line { border-top: 1px solid #111; margin-top: 18mm; padding-top: 2mm; font-size: 11px; }
+    .sign-row { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 6mm; gap: 4mm; }
+    .note { font-size: 9px; color: #333; line-height: 1.2; }
+    .sign { width: 55mm; text-align: center; }
+    .sign .line { border-top: 1px solid #111; margin-top: 14mm; padding-top: 1.5mm; font-size: 10px; }
   </style>
 </head>
 <body>
   <div class="page">
     <div class="invoice">
+      <div class="header-top">
+        <div class="logo-section">
+          <div style="font-size: 24px; font-weight: bold; color: #0052CC; letter-spacing: 2px;">SKYLA</div>
+        </div>
+        <div class="header-right">
+          <div class="bill-date"><strong>Bill No:</strong> ${billNumber || '-'}</div>
+          <div class="bill-date"><strong>Date:</strong> ${invoiceDate}</div>
+          ${LOGO_BASE64 ? `<div style="margin-top:3mm;">
+            <img src="${LOGO_BASE64}" alt="Skyla Logo" style="height:18mm;width:auto;display:block;margin-left:auto;" />
+          </div>` : '<div style="margin-top:3mm;font-size:9px;color:#0052CC;font-weight:700;letter-spacing:1px;">SKYLA</div>'}
+        </div>
+      </div>
+
       <div class="row">
         <div class="col">
           <div class="shop-name">${shopName || 'Shop Name'}</div>
           <div class="small muted">${shopAddress || ''}</div>
           <div class="small muted">GSTIN: ${shopGst || '-'}</div>
           <div class="small muted">Mobile: ${shopMobile || '-'}</div>
-        </div>
-        <div class="col" style="text-align:right;">
-          <div class="small"><strong>Bill No:</strong> ${billNumber || '-'}</div>
-          <div class="small"><strong>Date:</strong> ${invoiceDate}</div>
         </div>
       </div>
 

@@ -21,8 +21,9 @@ const errorHandler = require('./middleware/errorHandler');
 const app = express();
 
 // ----- Core Middleware -----
-const corsOptions = {
-  origin: [
+// Parse allowed origins from environment variable or use defaults
+const getAllowedOrigins = () => {
+  const defaultOrigins = [
     'http://localhost:5173',
     'http://127.0.0.1:5173',
     'http://localhost:5174',
@@ -30,7 +31,22 @@ const corsOptions = {
     'http://localhost:5175',
     'http://127.0.0.1:5175',
     'https://skyala.vercel.app',
-  ],
+  ];
+
+  // If FRONTEND_URL is set, parse it (comma-separated values)
+  if (process.env.FRONTEND_URL) {
+    const envOrigins = process.env.FRONTEND_URL.split(',')
+      .map((url) => url.trim())
+      .filter((url) => url);
+    // Combine with defaults, removing duplicates
+    return [...new Set([...defaultOrigins, ...envOrigins])];
+  }
+
+  return defaultOrigins;
+};
+
+const corsOptions = {
+  origin: getAllowedOrigins(),
   credentials: true,
 };
 app.use(cors(corsOptions));

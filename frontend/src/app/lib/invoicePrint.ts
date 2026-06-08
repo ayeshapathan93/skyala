@@ -88,7 +88,7 @@ export async function generateInvoicePdfBlob(html: string): Promise<Blob | null>
     const target = doc.querySelector(".invoice-wrap") || doc.body;
     const blob: Blob = await html2pdf()
       .set({
-        margin: [4, 4, 4, 4],
+        margin: [10, 10, 10, 10],
         image: { type: "jpeg", quality: 0.98 },
         html2canvas: {
           scale: 2,

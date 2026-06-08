@@ -379,6 +379,10 @@ export const api = {
     return requestBlob(`/bills/${id}/pdf`);
   },
 
+  async deleteBill(id: string) {
+    await request(`/bills/${id}`, { method: "DELETE" });
+  },
+
   async fetchBillHtml(id: string): Promise<string> {
     const token = authStore.getToken();
     const response = await fetch(`${API_BASE_URL}/bills/${id}/html`, {

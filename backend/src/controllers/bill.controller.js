@@ -57,3 +57,8 @@ exports.creditOutstanding = asyncHandler(async (req, res) => {
   const data = await billService.getCreditOutstanding(req.businessId);
   res.json({ success: true, data });
 });
+
+exports.deleteBill = asyncHandler(async (req, res) => {
+  await billService.deleteBill(req.params.id, req.businessId);
+  res.json({ success: true, message: 'Bill deleted successfully' });
+});

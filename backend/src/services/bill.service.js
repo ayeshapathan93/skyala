@@ -449,14 +449,14 @@ const generatePdf = async (bill, businessId) => {
     await page.goto(contentUrl, { waitUntil: 'networkidle0', timeout: 45000 });
     await page.waitForSelector('body', { timeout: 10000 });
     await page.evaluate(() => document.fonts?.ready);
-    await page.waitForTimeout(500);
+    await new Promise((r) => setTimeout(r, 500));
     await page.emulateMediaType('screen');
 
     const pdfOptions = {
       format: 'A4',
       printBackground: true,
       preferCSSPageSize: true,
-      margin: { top: '6mm', right: '6mm', bottom: '6mm', left: '6mm' },
+      margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' },
     };
 
     const pdfBuffer = await page.pdf(pdfOptions);
@@ -484,7 +484,6 @@ const getCreditOutstanding = async (businessId) => {
     {
       $match: {
         businessId: new mongoose.Types.ObjectId(businessId),
-        paymentType: 'credit',
         balanceAmount: { $gt: 0 },
       },
     },
@@ -503,6 +502,36 @@ const getCreditOutstanding = async (businessId) => {
 
   return rows;
 };
+
+const deleteBill = async (id, businessId) => {
+  return withOptionalTransaction(async (session) => {
+    const bill = await Bill.findOne({ _id: id, businessId });
+    if (!bill) throw new AppError('Bill not found', 404, 'BILL_NOT_FOUND');
+
+    const items = await BillItem.find({ billId: bill._id, businessId });
+
+    for (const item of items) {
+      await stockService.adjustStock(
+        item.productId,
+        item.quantity,
+        businessId,
+        { type: 'adjustment', note: `Restore stock from deleted Bill ${bill.invoiceNumber}` },
+        session
+      );
+    }
+
+    const deleteItemsQuery = BillItem.deleteMany({ billId: bill._id, businessId });
+    if (session) deleteItemsQuery.session(session);
+    await deleteItemsQuery;
+
+    const deleteBillQuery = Bill.deleteOne({ _id: bill._id, businessId });
+    if (session) deleteBillQuery.session(session);
+    await deleteBillQuery;
+
+    return bill;
+  });
+};
+
 
 const settleCredit = async (customerId, { amount, note, billId }, businessId) => {
   return withOptionalTransaction(async (session) => {
@@ -550,4 +579,5 @@ module.exports = {
   getCreditOutstanding,
   settleCredit,
   ensureBillingIndexes,
+  deleteBill,
 };

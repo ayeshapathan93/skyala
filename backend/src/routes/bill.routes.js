@@ -12,5 +12,6 @@ router.post('/', validate(createBillSchema), billController.create);
 router.get('/:id/html', billController.getHtml);
 router.get('/:id/pdf', billController.downloadPdf);
 router.get('/:id', billController.getById);
+router.delete('/:id', billController.deleteBill);
 
 module.exports = router;
