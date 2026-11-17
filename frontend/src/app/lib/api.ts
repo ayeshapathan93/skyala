@@ -165,6 +165,8 @@ export const authStore = {
   },
 };
 
+let refreshPromise: Promise<string> | null = null;
+
 const buildUrl = (path: string, query?: Record<string, string | number | boolean | undefined>) => {
   const url = new URL(`${API_BASE_URL}${path}`);
   Object.entries(query || {}).forEach(([key, value]) => {
@@ -184,19 +186,66 @@ function parseError(payload: unknown): string {
   return "Request failed";
 }
 
-async function request<T>(path: string, options: RequestInit = {}, query?: Record<string, string | number | boolean | undefined>) {
-  const token = authStore.getToken();
-  const response = await fetch(buildUrl(path, query), {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
-  });
+async function refreshAccessToken(): Promise<string> {
+  if (!refreshPromise) {
+    refreshPromise = (async () => {
+      const refreshToken = localStorage.getItem("skyla_refresh_token");
+      if (!refreshToken) {
+        authStore.clear();
+        throw new Error("Session expired. Please log in again.");
+      }
 
+      try {
+        const response = await fetch(buildUrl("/auth/refresh"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refreshToken }),
+        });
+        const payload = (await response.json()) as ApiResponse<{ token: string }>;
+        if (!response.ok || !payload.data?.token) {
+          throw new Error(parseError(payload));
+        }
+
+        localStorage.setItem("skyla_token", payload.data.token);
+        return payload.data.token;
+      } catch (error) {
+        authStore.clear();
+        throw error;
+      }
+    })().finally(() => {
+      refreshPromise = null;
+    });
+  }
+
+  return refreshPromise;
+}
+
+async function request<T>(path: string, options: RequestInit = {}, query?: Record<string, string | number | boolean | undefined>) {
+  const send = (token: string | null) =>
+    fetch(buildUrl(path, query), {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...options.headers,
+      },
+    });
+
+  let response = await send(authStore.getToken());
   const contentType = response.headers.get("content-type") || "";
-  const payload = contentType.includes("application/json") ? await response.json() : await response.text();
+  let payload = contentType.includes("application/json") ? await response.json() : await response.text();
+
+  if (
+    response.status === 401 &&
+    path !== "/auth/refresh" &&
+    payload &&
+    typeof payload === "object" &&
+    (payload as ApiResponse<unknown>).error?.code === "TOKEN_EXPIRED"
+  ) {
+    response = await send(await refreshAccessToken());
+    const retryContentType = response.headers.get("content-type") || "";
+    payload = retryContentType.includes("application/json") ? await response.json() : await response.text();
+  }
 
   if (!response.ok) {
     throw new Error(parseError(payload));

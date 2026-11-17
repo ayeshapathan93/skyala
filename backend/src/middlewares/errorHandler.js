@@ -24,6 +24,16 @@ const errorHandler = (err, req, res, next) => {
     details = Object.values(err.errors || {}).map((e) => ({ field: e.path, message: e.message }));
   }
 
+  if (err.name === 'TokenExpiredError') {
+    statusCode = 401;
+    code = 'TOKEN_EXPIRED';
+    message = 'Authentication token expired';
+  } else if (err.name === 'JsonWebTokenError' || err.name === 'NotBeforeError') {
+    statusCode = 401;
+    code = 'INVALID_TOKEN';
+    message = 'Invalid authentication token';
+  }
+
   if (err.code === 11000) {
     statusCode = 409;
     code = 'DUPLICATE';
